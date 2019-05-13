@@ -2,3 +2,4 @@
 /ssd512_120000
 /weights
 *.pth
+*.hdf5
