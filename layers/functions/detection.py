@@ -35,7 +35,7 @@ class Detect(Function):
         num_priors = prior_data.size(0)
         output = torch.zeros(num, self.num_classes, self.top_k, 5)
         conf_preds = conf_data.view(num, num_priors,
-                                    self.num_classes).transpose(2, 1)
+                                        self.num_classes).transpose(2, 1)
 
         # Decode predictions into bboxes.
         for i in range(num):
