@@ -11,7 +11,7 @@ from data import VOC_ROOT, VOC_CLASSES as labelmap
 from PIL import Image
 from data import VOCAnnotationTransform, VOCDetection, BaseTransform, VOC_CLASSES
 import torch.utils.data as data
-from ssd import build_ssd
+from models.ssd import build_ssd
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 parser = argparse.ArgumentParser(description='Single Shot MultiBox Detection')
 parser.add_argument('--trained_model', default='weights/ssd300_mAP_77.43_v2.pth',

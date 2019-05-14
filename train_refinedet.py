@@ -1,12 +1,13 @@
 from data import *
-from utils.augmentations import SSDAugmentation
-from layers.modules import MultiBoxLoss
-from models.ssd import build_ssd
-import os
 import sys
+sys.path.append("/home/f523/wangyang/detection/ssd.pytorch")
+from utils.augmentations import SSDAugmentation
+from layers.modules.refinedet_multibox_loss import RefineDetMultiBoxLoss
+#from ssd import build_ssd
+from models.refinedet import build_refinedet
+import os
 import time
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
@@ -14,8 +15,8 @@ import torch.nn.init as init
 import torch.utils.data as data
 import numpy as np
 import argparse
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-
+from utils.logging import Logger
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -25,17 +26,19 @@ parser = argparse.ArgumentParser(
 train_set = parser.add_mutually_exclusive_group()
 parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
                     type=str, help='VOC or COCO')
+parser.add_argument('--input_size', default='512', choices=['320', '512'],
+                    type=str, help='RefineDet320 or RefineDet512')
 parser.add_argument('--dataset_root', default=VOC_ROOT,
                     help='Dataset root directory path')
-parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
+parser.add_argument('--basenet', default='./weights/vgg16_reducedfc.pth',
                     help='Pretrained base model')
-parser.add_argument('--batch_size', default=16, type=int,
+parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=4, type=int,
+parser.add_argument('--num_workers', default=8, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
@@ -67,11 +70,11 @@ else:
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
+sys.stdout = Logger(os.path.join(args.save_folder, 'log.txt'))
 
 def train():
-    """
     if args.dataset == 'COCO':
-        if args.dataset_root == VOC_ROOT:
+        '''if args.dataset_root == VOC_ROOT:
             if not os.path.exists(COCO_ROOT):
                 parser.error('Must specify dataset_root if specifying dataset')
             print("WARNING: Using default COCO dataset_root because " +
@@ -80,12 +83,11 @@ def train():
         cfg = coco
         dataset = COCODetection(root=args.dataset_root,
                                 transform=SSDAugmentation(cfg['min_dim'],
-                                                          MEANS))
-                                                          """
-    if args.dataset == 'VOC':
-        #if args.dataset_root == COCO_ROOT:
-        #    parser.error('Must specify dataset if specifying dataset_root')
-        cfg = voc
+                                                          MEANS))'''
+    elif args.dataset == 'VOC':
+        '''if args.dataset_root == COCO_ROOT:
+            parser.error('Must specify dataset if specifying dataset_root')'''
+        cfg = voc_refinedet[args.input_size]
         dataset = VOCDetection(root=args.dataset_root,
                                transform=SSDAugmentation(cfg['min_dim'],
                                                          MEANS))
@@ -94,20 +96,23 @@ def train():
         import visdom
         viz = visdom.Visdom()
 
-    ssd_net = build_ssd('train', cfg['min_dim'], cfg['num_classes'])
-    net = ssd_net
+    refinedet_net = build_refinedet('train', cfg['min_dim'], cfg['num_classes'])
+    net = refinedet_net
+    print(net)
+    #input()
 
     if args.cuda:
-        net = torch.nn.DataParallel(ssd_net)
+        net = torch.nn.DataParallel(refinedet_net)
         cudnn.benchmark = True
 
     if args.resume:
         print('Resuming training, loading {}...'.format(args.resume))
-        ssd_net.load_weights(args.resume)
+        refinedet_net.load_weights(args.resume)
     else:
-        vgg_weights = torch.load(args.save_folder + args.basenet)
+        #vgg_weights = torch.load(args.save_folder + args.basenet)
+        vgg_weights = torch.load(args.basenet)
         print('Loading base network...')
-        ssd_net.vgg.load_state_dict(vgg_weights)
+        refinedet_net.vgg.load_state_dict(vgg_weights)
 
     if args.cuda:
         net = net.cuda()
@@ -115,31 +120,41 @@ def train():
     if not args.resume:
         print('Initializing weights...')
         # initialize newly added layers' weights with xavier method
-        ssd_net.extras.apply(weights_init)
-        ssd_net.loc.apply(weights_init)
-        ssd_net.conf.apply(weights_init)
+        refinedet_net.extras.apply(weights_init)
+        refinedet_net.arm_loc.apply(weights_init)
+        refinedet_net.arm_conf.apply(weights_init)
+        refinedet_net.odm_loc.apply(weights_init)
+        refinedet_net.odm_conf.apply(weights_init)
+        #refinedet_net.tcb.apply(weights_init)
+        refinedet_net.tcb0.apply(weights_init)
+        refinedet_net.tcb1.apply(weights_init)
+        refinedet_net.tcb2.apply(weights_init)
 
     optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=args.momentum,
                           weight_decay=args.weight_decay)
-    criterion = MultiBoxLoss(cfg['num_classes'], 0.5, True, 0, True, 3, 0.5,
+    arm_criterion = RefineDetMultiBoxLoss(2, 0.5, True, 0, True, 3, 0.5,
                              False, args.cuda)
+    odm_criterion = RefineDetMultiBoxLoss(cfg['num_classes'], 0.5, True, 0, True, 3, 0.5,
+                             False, args.cuda, use_ARM=True)
 
     net.train()
     # loss counters
-    loc_loss = 0
-    conf_loss = 0
+    arm_loc_loss = 0
+    arm_conf_loss = 0
+    odm_loc_loss = 0
+    odm_conf_loss = 0
     epoch = 0
     print('Loading the dataset...')
 
     epoch_size = len(dataset) // args.batch_size
-    print('Training SSD on:', dataset.name)
+    print('Training RefineDet on:', dataset.name)
     print('Using the specified args:')
     print(args)
 
     step_index = 0
 
     if args.visdom:
-        vis_title = 'SSD.PyTorch on ' + dataset.name
+        vis_title = 'RefineDet.PyTorch on ' + dataset.name
         vis_legend = ['Loc Loss', 'Conf Loss', 'Total Loss']
         iter_plot = create_vis_plot('Iteration', 'Loss', vis_title, vis_legend)
         epoch_plot = create_vis_plot('Epoch', 'Loss', vis_title, vis_legend)
@@ -148,14 +163,16 @@ def train():
                                   num_workers=args.num_workers,
                                   shuffle=True, collate_fn=detection_collate,
                                   pin_memory=True)
-
     # create batch iterator
     batch_iterator = None
     for iteration in range(args.start_iter, cfg['max_iter']):
         if (not batch_iterator) or (iteration % epoch_size ==0):
             batch_iterator = iter(data_loader)
-            loc_loss = 0
-            conf_loss = 0
+            # reset epoch loss counters
+            arm_loc_loss = 0
+            arm_conf_loss = 0
+            odm_loc_loss = 0
+            odm_conf_loss = 0
             epoch += 1
 
         if iteration in cfg['lr_steps']:
@@ -164,43 +181,52 @@ def train():
 
         # load train data
         try:
-            images,targets = next(batch_iterator)
+            images, targets = next(batch_iterator)
         except StopIteration:
-            bath_interator = iter(data_loader)
-            images,targets = next(batch_iterator)
+            batch_iterator = iter(data_loader)
+            images, targets = next(batch_iterator)
+
         if args.cuda:
-            images = Variable(images.cuda())
-            targets = [Variable(ann.cuda(), volatile=True) for ann in targets]
+            images = images.cuda()
+            targets = [ann.cuda() for ann in targets]
         else:
-            images = Variable(images)
-            targets = [Variable(ann, volatile=True) for ann in targets]
+            images = images
+            targets = [ann for ann in targets]
         # forward
         t0 = time.time()
         out = net(images)
         # backprop
         optimizer.zero_grad()
-        loss_l, loss_c = criterion(out, targets)
-        loss = loss_l + loss_c
+        arm_loss_l, arm_loss_c = arm_criterion(out, targets)
+        odm_loss_l, odm_loss_c = odm_criterion(out, targets)
+        #input()
+        arm_loss = arm_loss_l + arm_loss_c
+        odm_loss = odm_loss_l + odm_loss_c
+        loss = arm_loss + odm_loss
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        arm_loc_loss += arm_loss_l.item()
+        arm_conf_loss += arm_loss_c.item()
+        odm_loc_loss += odm_loss_l.item()
+        odm_conf_loss += odm_loss_c.item()
 
         if iteration % 10 == 0:
             print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
+            print('iter ' + repr(iteration) + ' || ARM_L Loss: %.4f ARM_C Loss: %.4f ODM_L Loss: %.4f ODM_C Loss: %.4f ||' \
+            % (arm_loss_l.item(), arm_loss_c.item(), odm_loss_l.item(), odm_loss_c.item()), end=' ')
 
         if args.visdom:
-            update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
+            update_vis_plot(iteration, arm_loss_l.data[0], arm_loss_c.data[0],
                             iter_plot, epoch_plot, 'append')
 
         if iteration != 0 and iteration % 5000 == 0:
             print('Saving state, iter:', iteration)
-            torch.save(ssd_net.state_dict(), 'weights/ssd512_VOC07_' +
-                       repr(iteration) + '.pth')
-    torch.save(ssd_net.state_dict(),
-               args.save_folder + '' + args.dataset + '.pth')
+            torch.save(refinedet_net.state_dict(), args.save_folder
+            + '/RefineDet{}_{}_{}.pth'.format(args.input_size, args.dataset,
+            repr(iteration)))
+    torch.save(refinedet_net.state_dict(), args.save_folder
+            + '/RefineDet{}_{}_final.pth'.format(args.input_size, args.dataset))
 
 
 def adjust_learning_rate(optimizer, gamma, step):
@@ -215,11 +241,14 @@ def adjust_learning_rate(optimizer, gamma, step):
 
 
 def xavier(param):
-    init.xavier_uniform(param)
+    init.xavier_uniform_(param)
 
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
+        xavier(m.weight.data)
+        m.bias.data.zero_()
+    elif isinstance(m, nn.ConvTranspose2d):
         xavier(m.weight.data)
         m.bias.data.zero_()
 
