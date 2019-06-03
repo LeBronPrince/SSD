@@ -22,13 +22,13 @@ import argparse
 import numpy as np
 import pickle
 import cv2
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -36,7 +36,7 @@ def str2bool(v):
 parser = argparse.ArgumentParser(
     description='Single Shot MultiBox Detector Evaluation')
 parser.add_argument('--trained_model',
-                    default='weights/ssd300_mAP_77.43_v2.pth', type=str,
+                    default='weights/remote_scensing/RefineDet512_VOC_85000.pth', type=str,
                     help='Trained state_dict file path to open')
 parser.add_argument('--save_folder', default='eval/', type=str,
                     help='File path to save results')
@@ -50,7 +50,7 @@ parser.add_argument('--voc_root', default=VOC_ROOT,
                     help='Location of VOC root directory')
 parser.add_argument('--cleanup', default=True, type=str2bool,
                     help='Cleanup and remove results files following eval')
-parser.add_argument('--input_size', default='320', choices=['320', '512'],
+parser.add_argument('--input_size', default='512', choices=['320', '512'],
                     type=str, help='RefineDet320 or RefineDet512')
 
 args = parser.parse_args()
@@ -376,7 +376,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
     _t = {'im_detect': Timer(), 'misc': Timer()}
     output_dir = get_output_dir('ssd300_120000', set_type)
     det_file = os.path.join(output_dir, 'detections.pkl')
-
+    tot_detect_time = 0
     for i in range(num_images):
         im, gt, h, w = dataset.pull_item(i)
 
@@ -404,7 +404,8 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
                                   scores[:, np.newaxis])).astype(np.float32,
                                                                  copy=False)
             all_boxes[j][i] = cls_dets
-
+            #detect_time = _t['im_detect'].toc(average=False)
+        tot_detect_time += detect_time if i > 0 else 0
         print('im_detect: {:d}/{:d} {:.3f}s'.format(i + 1,
                                                     num_images, detect_time))
 
@@ -413,7 +414,7 @@ def test_net(save_folder, net, cuda, dataset, transform, top_k,
 
     print('Evaluating detections')
     evaluate_detections(all_boxes, output_dir, dataset)
-
+    print('FPS: {:.3f} fps'.format((num_images - 1) / (tot_detect_time)))
 
 def evaluate_detections(box_list, output_dir, dataset):
     write_voc_results_file(box_list, dataset)
@@ -422,7 +423,7 @@ def evaluate_detections(box_list, output_dir, dataset):
 
 if __name__ == '__main__':
     # load net
-    num_classes = len(labelmap) + 1                      # +1 for background
+    num_classes = len(labelmap)+1                    # +1 for background
     net = build_refinedet('test', int(args.input_size), num_classes)            # initialize SSD
     net.load_state_dict(torch.load(args.trained_model))
     net.eval()

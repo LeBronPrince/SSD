@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from layers import *
 from data import voc_refinedet, coco_refinedet
 import os
-
+from layers.functions.detection_refinedet import Detect_RefineDet
 
 class RefineDet(nn.Module):
     """Single Shot Multibox Architecture
@@ -29,7 +29,7 @@ class RefineDet(nn.Module):
         super(RefineDet, self).__init__()
         self.phase = phase
         self.num_classes = num_classes
-        self.cfg = (coco_refinedet, voc_refinedet)[num_classes == 21]
+        self.cfg = voc_refinedet
         self.priorbox = PriorBox(self.cfg[str(size)])
         with torch.no_grad():
             self.priors = self.priorbox.forward()

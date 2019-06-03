@@ -12,7 +12,7 @@ COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
 MEANS = (104, 117, 123)
 '''
 voc = {
-    'num_classes': 21,
+    'num_classes': 10,
     'lr_steps': (60000, 80000, 100000),
     'max_iter': 120000,
     'feature_maps': [38, 19, 10, 5, 3, 1],
@@ -29,7 +29,7 @@ voc = {
 '''
 
 voc = {
-    'num_classes': 21,
+    'num_classes': 11,
     'lr_steps': (60000, 80000, 100000),
     'max_iter': 120001,
     'feature_maps': [64, 32, 16, 8, 6, 4, 2],
@@ -61,7 +61,7 @@ coco = {
 
 voc_refinedet = {
     '320': {
-        'num_classes': 21,
+        'num_classes': 11,
         'lr_steps': (80000, 100000, 120000),
         'max_iter': 120000,
         'feature_maps': [40, 20, 10, 5],
@@ -75,9 +75,9 @@ voc_refinedet = {
         'name': 'RefineDet_VOC_320',
     },
     '512': {
-        'num_classes': 21,
+        'num_classes': 11,
         'lr_steps': (80000, 100000, 120000),
-        'max_iter': 120000,
+        'max_iter': 120001,
         'feature_maps': [64, 32, 16, 8],
         'min_dim': 512,
         'steps': [8, 16, 32, 64],
@@ -86,7 +86,7 @@ voc_refinedet = {
         'aspect_ratios': [[2], [2], [2], [2]],
         'variance': [0.1, 0.2],
         'clip': True,
-        'name': 'RefineDet_VOC_320',
+        'name': 'RefineDet_VOC_512',
     }
 }
 

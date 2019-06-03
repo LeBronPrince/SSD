@@ -21,9 +21,9 @@ import cv2
 if torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-from models.ssd import build_ssd
+from models.refinedet import build_refinedet
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 # ## Build SSD300 in Test Phase
 # 1. Build the architecture, specifyingsize of the input image (300),
 #     and number of object classes to score (21 for VOC dataset)
@@ -31,8 +31,8 @@ from models.ssd import build_ssd
 
 # In[2]:
 
-net = build_ssd('test', 512, 21)    # initialize SSD
-net.load_weights('../weights/ssd500_VOC07_105000.pth')
+net = build_refinedet('test', 512, 11)    # initialize SSD
+net.load_weights('../weights/remote_scensing/RefineDet512_VOC_70000.pth')
 
 
 # ## Load Image
@@ -46,7 +46,7 @@ from matplotlib import pyplot as plt
 from data import VOCDetection, VOC_ROOT, VOCAnnotationTransform
 # here we specify year (07 or 12) and dataset ('test', 'val', 'train')
 testset = VOCDetection(VOC_ROOT, [('2007', 'test')], None, VOCAnnotationTransform())
-img_id = 66
+img_id = 101 #46 42 101
 image = testset.pull_image(img_id)
 rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 # View the sampled input image before transform

@@ -16,7 +16,7 @@ import torch.utils.data as data
 import numpy as np
 import argparse
 from utils.logging import Logger
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
@@ -52,7 +52,7 @@ parser.add_argument('--gamma', default=0.1, type=float,
                     help='Gamma update for SGD')
 parser.add_argument('--visdom', default=False, type=str2bool,
                     help='Use visdom for loss visualization')
-parser.add_argument('--save_folder', default='weights/',
+parser.add_argument('--save_folder', default='weights/remote_scensing/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
 

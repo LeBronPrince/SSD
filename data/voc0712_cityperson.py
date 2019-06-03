@@ -16,21 +16,12 @@ if sys.version_info[0] == 2:
     import xml.etree.cElementTree as ET
 else:
     import xml.etree.ElementTree as ET
-'''
+
 VOC_CLASSES = (  # always index 0
-    'aeroplane', 'bicycle', 'bird', 'boat',
-    'bottle', 'bus', 'car', 'cat', 'chair',
-    'cow', 'diningtable', 'dog', 'horse',
-    'motorbike', 'person', 'pottedplant',
-    'sheep', 'sofa', 'train', 'tvmonitor')
-    '''
-VOC_CLASSES = (  # always index 0
-    '1', '2', '3',
-    '4', '5', '6', '7', '8',
-    '9','10')
-#/home/f523/yin/fpn_yaogan/data/VOCdevkit2007/VOC2007
+    'ped','ignore')
+
 # note: if you used our download scripts, this should be right
-VOC_ROOT = "/home/f523/yin/fpn_yaogan/data/VOCdevkit2007/"
+#VOC_ROOT = "/home/f523/wangyang/detection/cityperson/voc/data"
 
 
 class VOCAnnotationTransform(object):
@@ -70,7 +61,7 @@ class VOCAnnotationTransform(object):
             pts = ['xmin', 'ymin', 'xmax', 'ymax']
             bndbox = []
             for i, pt in enumerate(pts):
-                cur_pt = int(bbox.find(pt).text) - 1
+                cur_pt = int(float(bbox.find(pt).text)) - 1
                 # scale height or width
                 cur_pt = cur_pt / width if i % 2 == 0 else cur_pt / height
                 bndbox.append(cur_pt)
@@ -82,7 +73,7 @@ class VOCAnnotationTransform(object):
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
 
-class VOCDetection(data.Dataset):
+class VOCDetection_City(data.Dataset):
     """VOC Detection Dataset Object
 
     input is image, target is annotation
@@ -111,10 +102,9 @@ class VOCDetection(data.Dataset):
         self._annopath = osp.join('%s', 'Annotations', '%s.xml')
         self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
         self.ids = list()
-        for (year, name) in image_sets:
-            rootpath = osp.join(self.root, 'VOC' + year)
-            for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
-                self.ids.append((rootpath, line.strip()))
+
+        for line in open(osp.join(self.root, 'ImageSets', 'Main', 'train.txt')):
+            self.ids.append((self.root, line.strip()))
 
     def __getitem__(self, index):
         im, gt, h, w = self.pull_item(index)

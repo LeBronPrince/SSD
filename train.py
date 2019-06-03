@@ -1,4 +1,5 @@
 from data import *
+#from data.voc0712_cityperson import VOCDetection_City
 from utils.augmentations import SSDAugmentation
 from layers.modules import MultiBoxLoss
 from models.ssd import build_ssd
@@ -14,7 +15,7 @@ import torch.nn.init as init
 import torch.utils.data as data
 import numpy as np
 import argparse
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -30,7 +31,7 @@ parser.add_argument('--dataset_root', default=VOC_ROOT,
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
 parser.add_argument('--ngpu', default=1, type=int, help='gpus')
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=16, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -50,7 +51,7 @@ parser.add_argument('--gamma', default=0.1, type=float,
                     help='Gamma update for SGD')
 parser.add_argument('--visdom', default=False, type=str2bool,
                     help='Use visdom for loss visualization')
-parser.add_argument('--save_folder', default='weights/',
+parser.add_argument('--save_folder', default='weights/remote_scensing/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
 
